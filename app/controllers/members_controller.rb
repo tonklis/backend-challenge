@@ -1,8 +1,8 @@
 class MembersController < ApplicationController
 
   def index
-    # counting friendships and extended friendships in view
     begin
+      # counting friendships and extended friendships in view
       @members = Member.all
     rescue StandardError => e
       render json: { errors: ["Error getting all members"] }, status: 500
@@ -11,6 +11,7 @@ class MembersController < ApplicationController
 
   def show
     begin
+      # adding associations to avoid n-queries in views
       @member = Member.includes(:topics, friendships: :friend, extended_friendships: :member).find(params[:id])
     rescue StandardError => e
       render_500_error(e)
@@ -30,6 +31,17 @@ class MembersController < ApplicationController
     end
   end
 
+  def search
+    begin
+      topic = params[:topic]
+      @member = Member.find(params[:id])
+      @result_paths = @member.search(topic)
+      render :search, status: :ok
+    rescue StandardError => e
+      render json: { errors: ["Error performing topic search"] }, status: 500
+    end
+  end
+
   private
 
   def member_params
@@ -43,7 +55,7 @@ class MembersController < ApplicationController
 
   def render_500_error(e)
     @member = Member.new if @member.nil?
-    @member.errors.add(:error_creating_friendship, e)
+    @member.errors.add(:members_controller_error, e)
     render json: { errors: @member.errors.full_messages }, status: 500
   end
 

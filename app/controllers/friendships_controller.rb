@@ -28,7 +28,7 @@ class FriendshipsController < ApplicationController
 
   def render_500_error(e)
     @friendship = Friendship.new if @friendship.nil?
-    @friendship.errors.add(:error_creating_friendship, e)
+    @friendship.errors.add(:friendships_controller_error, e)
     render json: { errors: @friendship.errors.full_messages }, status: 500
   end
 

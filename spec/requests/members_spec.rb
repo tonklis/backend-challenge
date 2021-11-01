@@ -42,10 +42,47 @@ describe 'Members', type: :request do
   #member_01's friendships
   let!(:friendship_01){ create(:friendship, member: member_01, friend: member_02) }
   let!(:friendship_02){ create(:friendship, member: member_03, friend: member_01) }
+  let!(:friendship_03){ create(:friendship, member: member_04, friend: member_02) }
 
   #member_01's topics
   let!(:topic_01){ create(:topic, name: "Africa", member: member_01) }
   let!(:topic_02){ create(:topic, name: "Asia", member: member_01) }
+  #member_04's topics
+  let!(:topic_03){ create(:topic, name: "water shortage", member: member_04) }
+
+  describe 'searching topics' do
+
+    subject { get "/members/#{member_01.id}/search?topic=water", headers: headers }
+
+    it 'returns the correct status code' do
+      subject
+      expect(response).to have_http_status(:success)
+    end
+
+    it 'returns a hash of topics with an ordered array of the members path' do
+      subject
+      expect(body["topics"]).to be_an_instance_of(Hash)
+      expect(body["topics"]["water shortage"].size).to eq 2
+    end
+
+  end
+
+  describe 'when topic not found' do
+
+    subject { get "/members/#{member_01.id}/search?topic=earth", headers: headers }
+
+    it 'returns the correct status code' do
+      subject
+      expect(response).to have_http_status(:success)
+    end
+
+    it 'returns a hash of topics with an ordered array of the members path' do
+      subject
+      expect(body["topics"]).to be_an_instance_of(Hash)
+      expect(body["topics"].size).to eq 0
+    end
+
+  end
 
   describe 'viewing all members' do
 
@@ -91,7 +128,7 @@ describe 'Members', type: :request do
       end
     end
 
-    context 'when member not fond' do
+    context 'when member not found' do
       subject { get '/members/0', headers: headers }
 
       it 'returns the correct status code' do
