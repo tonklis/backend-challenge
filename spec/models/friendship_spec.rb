@@ -5,7 +5,7 @@ RSpec.describe Friendship, type: :model do
   let!(:member_02){ create(:member, first_name: 'Bo') }
   let!(:member_03){ create(:member, first_name: 'Co') }
 
-  describe 'creation scenario' do
+  context 'creation scenario' do
     it 'should check uniqueness ' do
       friendship_01 = Friendship.create(member: member_01, friend: member_02)
 
@@ -20,8 +20,7 @@ RSpec.describe Friendship, type: :model do
     end
   end
 
-  describe 'associations and bidireccionality' do
-
+  context 'associations and bidireccionality' do
     let!(:friendship_01){ create(:friendship, member: member_01, friend: member_02) }
     let!(:friendship_02){ create(:friendship, member: member_03, friend: member_01) }
 
@@ -30,5 +29,4 @@ RSpec.describe Friendship, type: :model do
       expect(member_01.extended_friendships.count).to eq 1
     end
   end
-
 end
