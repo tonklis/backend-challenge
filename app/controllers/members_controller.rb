@@ -12,7 +12,7 @@ class MembersController < ApplicationController
   def show
     begin
       # adding associations to avoid n-queries in views
-      @member = Member.includes(:topics, friendships: :friend, extended_friendships: :member).find(params[:id])
+      @member = Member.includes(:topics, :friends, :extended_friends).find(params[:id])
     rescue StandardError => e
       render_500_error(e)
     end
@@ -34,8 +34,9 @@ class MembersController < ApplicationController
   def search
     begin
       topic = params[:topic]
-      @member = Member.find(params[:id])
-      @result_paths = @member.search(topic)
+      # friends and extended friends associations used in search algorithm
+      @member = Member.includes(:friends, :extended_friends).find(params[:id])
+      @paths_per_topic = @member.search(topic)
       render :search, status: :ok
     rescue StandardError => e
       render json: { errors: ["Error performing topic search"] }, status: 500

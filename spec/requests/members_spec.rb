@@ -47,6 +47,7 @@ describe 'Members', type: :request do
   #member_01's topics
   let!(:topic_01){ create(:topic, name: "Africa", member: member_01) }
   let!(:topic_02){ create(:topic, name: "Asia", member: member_01) }
+
   #member_04's topics
   let!(:topic_03){ create(:topic, name: "water shortage", member: member_04) }
 
@@ -61,8 +62,11 @@ describe 'Members', type: :request do
 
     it 'returns a hash of topics with an ordered array of the members path' do
       subject
-      expect(body["topics"]).to be_an_instance_of(Hash)
-      expect(body["topics"]["water shortage"].size).to eq 2
+      expect(body).to be_an_instance_of(Array)
+      expect(body[0]["topic"]).to eq "water shortage"
+      expect(body[0]["path"].size).to eq 2
+      expect(body[0]["path"][0]["first_name"]).to eq "Io"
+      expect(body[0]["path"][1]["first_name"]).to eq "Po"
     end
 
   end
@@ -78,8 +82,8 @@ describe 'Members', type: :request do
 
     it 'returns a hash of topics with an ordered array of the members path' do
       subject
-      expect(body["topics"]).to be_an_instance_of(Hash)
-      expect(body["topics"].size).to eq 0
+      expect(body).to be_an_instance_of(Array)
+      expect(body.size).to eq 0
     end
 
   end
@@ -123,8 +127,8 @@ describe 'Members', type: :request do
         expect(body["short_url"]).to_not be nil
         expect(body["topics"].size).to eq 2
         expect(body["topics"][0]["name"]).to eq topic_01.name
-        expect(body["friendships"].size).to eq 2
-        expect(body["friendships"][0]["short_url"]).to_not be nil
+        expect(body["friends"].size).to eq 2
+        expect(body["friends"][0]["short_url"]).to_not be nil
       end
     end
 

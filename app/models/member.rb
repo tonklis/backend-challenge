@@ -1,62 +1,86 @@
 class Member < ApplicationRecord
   has_many :topics, dependent: :destroy
-  has_many :friendships
-  has_many :extended_friendships, foreign_key: "friend_id", class_name: "Friendship"
 
-  after_save :shorten_url_and_get_topics
+  # Friends which are directly associated to the member
+  has_many :friendships
+  has_many :friends, through: :friendships, source: :friend, class_name: 'Member'
+
+  # Friends in which the member is associated as friend
+  has_many :extended_friendships, foreign_key: :friend_id, class_name: "Friendship"
+  has_many :extended_friends, through: :extended_friendships, source: :member, class_name: 'Member'
 
   # TODO: add first_name, last_name, url validators
 
-  # Search algorithm first approach
-  def search(topic)
-    #1. Search topics outside's friends and extended_friends
+  # Asynch jobs with sidekiq
+  after_save :shorten_url_and_get_topics
 
+  # Search topics outside of friends and extended_friends range
+  def search(topic)
     # Including and joining members
-    topics = Topic.includes(:member).joins(:member)
+    topics = Topic.includes(member: [:friends, :extended_friends]).joins(:member)
     # filtering case insensitive topic TODO: use pgsearch for partial words
     topics = topics.where("topics.name ILIKE ?", "%#{topic}%")
-    # avoiding results that are within this member's friends
-    topics = topics.where("members.id NOT IN (?)", self.friendships + self.extended_friendships)
+    # avoiding results that are within this member's friends and extended friends range
+    topics = topics.where("members.id NOT IN (?)", self.friends + self.extended_friends)
 
-    #2. Find path from source member to each topic's member
-    result_paths = {}
+    # Find path from source member to the target member based on the topics found
+    paths_per_topic = {}
     topics.each do |topic|
       visited = []
-      path = []
-      Member.find_path(self, self, topic.member, path, visited)
-      result_paths[topic.name] = path if !path.empty? && path.reverse!
+      paths = []
+      # Calling the recursive find with initial values
+      Member.find_path(self, self, topic.member, visited, paths)
+      # Removing the head root node
+      paths.map!{|path| path[1..-1]}
+      unless paths.empty?
+        # Getting the shortest path if more than one is found
+        path = Utils.shortest_path(paths)
+        # Assigning the shortest path to the topic
+        paths_per_topic[topic.name] = path
+      end
     end
-    return result_paths
-
+    return paths_per_topic
   end
 
   # Recursive method that has a starting root node, a current traversing node
-  # the target node (got from topic search), the result path and the visited nodes
-  # TODO: fix to get the shortest path - it only returns the first found path
-  def self.find_path(root, current, target, paths, visited)
+  # the target node (from topic search), the visited nodes, and the result paths
+  def self.find_path(root, current, target, visited, result_paths)
 
-    path_size = paths.size
+    # registering the visit
     visited << current
-    # There is a path
+    # A result path was found!
     if current == target
-      paths << current
-      return
+      # duplicating the array so it doesn't get modified by futher visits
+      # and dropping the first position since it is the root node
+      result_paths << visited.dup
+      # Remove this member from the visited array
+      return visited[0..-2]
     end
 
-    ext_friends = current.extended_friendships
+    # Traversing extended friends
+    ext_friends = current.extended_friends
     ext_friends.each do |ext_friend|
-      self.find_path(root, ext_friend.member, target, paths, visited) if !visited.include?(ext_friend.member)
+      # only call recursively if it hasn't been visited to avoid circular loops
+      unless visited.include?(ext_friend)
+        # returns the visited path with this member if a path was found,
+        # or the visited array without it (traversed ext friends and dint' find a path)
+        visited = self.find_path(root, ext_friend, target, visited, result_paths)
+      end
     end
 
-    friends = current.friendships
+    # Traversing direct friends
+    friends = current.friends
     friends.each do |friend|
-      self.find_path(root, friend.friend, target, paths, visited) if !visited.include?(friend.friend)
+      unless visited.include?(friend)
+        # returns the visited path with this member if a path was found,
+        # or the visited array without it (traversed friends and dint' find a path)
+        visited = self.find_path(root, friend, target, visited, result_paths)
+      end
     end
 
-    if path_size != paths.size
-      paths << current if current != root
-    end
-
+    # Remove this member from the visited array
+    visited = visited[0..-2]
+    return visited
   end
 
   private
@@ -65,7 +89,7 @@ class Member < ApplicationRecord
     if self.short_url.nil?
       ShortenerJob.perform_later(self)
       ScraperJob.perform_later(self)
-    # TODO: Define what to do if save is called to update url
+    # check if it's ok to re-calculate if save is called to update url
     elsif saved_change_to_url?
       ShortenerJob.perform_later(self)
       ScraperJob.perform_later(self)

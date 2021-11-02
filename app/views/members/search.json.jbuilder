@@ -1,6 +1,6 @@
-paths_per_topic = @result_paths.map do |key, value|
-  # key is the topic, value is the path to search array
-  [ key, value ]
+json.array! @paths_per_topic do |topic_with_path|
+  json.topic topic_with_path[0]
+  json.path topic_with_path[1] do |member|
+    json.extract! member, :first_name, :last_name
+  end
 end
-json.topics Hash[paths_per_topic]
-
